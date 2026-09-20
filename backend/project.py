@@ -8,9 +8,7 @@ from pathlib import Path
 class AMCProject:
     def __init__(self, base_path: str, project_name: str):
         """
-        Khởi tạo hoặc tải một dự án AMC.
-        :param base_path: Thư mục gốc chứa tất cả các dự án (ví dụ: ~/MC-Projects)
-        :param project_name: Tên dự án (ví dụ: testing4)
+        Khởi tạo hoặc tải một dự án AMC với các đường dẫn thư mục cần thiết.
         """
         self.project_dir = Path(base_path) / project_name
         self.data_dir = self.project_dir / "data"
@@ -22,7 +20,7 @@ class AMCProject:
 
     def create(self):
         """
-        Tạo cấu trúc thư mục chuẩn cho một dự án AMC mới và khởi tạo 5 file SQLite.
+        Tạo cấu trúc thư mục chuẩn cho một dự án AMC mới và khởi tạo các tệp cấu hình mặc định.
         """
         if self.project_dir.exists():
             raise FileExistsError(f"Project '{self.project_dir.name}' already exists.")
@@ -50,20 +48,21 @@ class AMCProject:
             f.write("name,forename,id\n")
             f.write("Tuan1,DinhVu,24020349\n")
             f.write("Tuan2,ThiVu,24020341\n")
-
-        # Xóa dòng gọi database.py
-        # init_all_dbs(str(self.data_dir))
         
         print(f"Project '{self.project_dir.name}' created successfully at {self.project_dir}")
 
     def delete(self):
-        """Xóa vĩnh viễn toàn bộ thư mục dự án."""
+        """
+        Xóa vĩnh viễn toàn bộ thư mục dự án.
+        """
         if self.project_dir.exists():
             shutil.rmtree(self.project_dir)
             print(f"Project '{self.project_dir.name}' deleted.")
 
     def rename(self, new_name: str):
-        """Đổi tên thư mục dự án và các file .tex / .txt bên trong."""
+        """
+        Đổi tên thư mục dự án và cập nhật lại tên các tệp nguồn bên trong.
+        """
         new_project_dir = self.project_dir.parent / new_name
         if new_project_dir.exists():
             raise FileExistsError(f"Project '{new_name}' already exists.")
@@ -91,7 +90,9 @@ class AMCProject:
         self.anonymous_dir = self.project_dir / "anonymous"
 
     def copy(self, new_name: str):
-        """Nhân bản thư mục dự án và cập nhật tên file .tex / .txt bên trong."""
+        """
+        Nhân bản thư mục dự án sang một tên mới và cập nhật lại các tệp nguồn.
+        """
         new_project_dir = self.project_dir.parent / new_name
         if new_project_dir.exists():
             raise FileExistsError(f"Project '{new_name}' already exists.")
@@ -110,7 +111,9 @@ class AMCProject:
                 print(f"Renamed cloned file {old_file.name} to {new_file.name}")
 
     def export_zip_template(self, dest_dir: str, file_name: str, short_name: str, description: str, included_files: list) -> str:
-        """Đóng gói dự án thành file ZIP và trả về đường dẫn tới file đó."""
+        """
+        Đóng gói dự án thành tệp ZIP mẫu để lưu trữ hoặc chia sẻ.
+        """
         model_dir = Path(dest_dir)
         model_dir.mkdir(parents=True, exist_ok=True)
         
@@ -126,7 +129,6 @@ class AMCProject:
         text_elem = ET.SubElement(root, "text")
         text_elem.text = description
 
-        # Tạo nội dung XML trong memory, không ghi ra đĩa
         xml_data = ET.tostring(root, encoding='utf-8', method='xml', xml_declaration=True)
 
         from zipfile import ZipFile
@@ -142,13 +144,21 @@ class AMCProject:
         return str(output_zip_path)
     
     def get_cleanup_info(self) -> dict:
-        """Lấy thông tin dung lượng của các thư mục trung gian để chuẩn bị cleanup."""
+        """
+        Lấy thông tin dung lượng của các thư mục trung gian cần dọn dẹp.
+        """
         def get_dir_size(path: Path) -> int:
+            """
+            Tính tổng dung lượng (byte) của tất cả các tệp trong thư mục.
+            """
             if not path.exists() or not path.is_dir():
                 return 0
             return sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
 
         def format_size(size: int) -> str:
+            """
+            Chuyển đổi kích thước byte sang định dạng chuỗi dễ đọc (B, KB, MB, GB).
+            """
             if size == 0: return "0"
             if size < 1024: return f"{size} B"
             elif size < 1024 * 1024: return f"{size / 1024:.1f}k"
@@ -171,8 +181,13 @@ class AMCProject:
         }
 
     def cleanup(self, zooms: bool, layout_reports: bool, annotated_pages: bool):
-        """Xóa nội dung các thư mục trung gian."""
+        """
+        Xóa nội dung của các thư mục trung gian đã chọn để giải phóng dung lượng.
+        """
         def clear_dir(path: Path):
+            """
+            Xóa sạch và tạo lại thư mục trống nếu thư mục tồn tại.
+            """
             if path.exists() and path.is_dir():
                 shutil.rmtree(path, ignore_errors=True)
                 path.mkdir(parents=True, exist_ok=True)
@@ -185,7 +200,9 @@ class AMCProject:
             clear_dir(self.cr_dir / "corrections" / "jpg")
 
     def _create_default_xml_files(self):
-        """Tạo các file description.xml và options.xml rỗng/mặc định"""
+        """
+        Tạo các tệp cấu hình XML mặc định (description.xml và options.xml) cho dự án.
+        """
         desc_path = self.project_dir / "description.xml"
         options_path = self.project_dir / "options.xml"
         
@@ -193,12 +210,12 @@ class AMCProject:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n<project>\n</project>')
             
         with open(options_path, 'w', encoding='utf-8') as f:
-            # AMC's XML loader cannot consume a completely empty root element.
-            # Keep a harmless metadata value so it always deserializes to a map.
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n<projetAMC>\n  <project_version>1</project_version>\n</projetAMC>')
 
     def ensure_valid_options_file(self):
-        """Repair projects created with the old empty options.xml skeleton."""
+        """
+        Đảm bảo tệp options.xml tồn tại và có cấu trúc XML hợp lệ.
+        """
         options_path = self.project_dir / "options.xml"
         if not options_path.exists():
             self._create_default_xml_files()
@@ -211,7 +228,9 @@ class AMCProject:
             )
 
     def get_option(self, key: str, default: str = "") -> str:
-        """Đọc một tùy chọn từ options.xml."""
+        """
+        Đọc giá trị của một tùy chọn từ tệp options.xml.
+        """
         options_path = self.project_dir / "options.xml"
         if not options_path.exists():
             return default
@@ -226,7 +245,9 @@ class AMCProject:
         return default
 
     def set_option(self, key: str, value: str):
-        """Lưu một tùy chọn vào options.xml."""
+        """
+        Lưu hoặc cập nhật một tùy chọn vào tệp options.xml.
+        """
         options_path = self.project_dir / "options.xml"
         self.ensure_valid_options_file()
         try:
@@ -257,6 +278,9 @@ class AMCProject:
                 global_defaults = {}
 
         def _fmt_num(val, default):
+            """
+            Định dạng số thành chuỗi hiển thị gọn (bỏ phần thập phân nếu là số nguyên).
+            """
             if val is None or val == "":
                 return default
             try:
@@ -265,7 +289,7 @@ class AMCProject:
             except (ValueError, TypeError):
                 return str(val)
 
-        # Default fallbacks from global settings
+
         default_seuil = float(global_defaults.get("default_darkness_threshold", 0.15))
         default_seuil_up = float(global_defaults.get("default_upper_darkness_threshold", 1.00))
         default_name_field = str(global_defaults.get("name_field_type", "image"))
@@ -289,6 +313,9 @@ class AMCProject:
                 print(f"Error parsing {options_path}: {e}")
 
         def _get_float(key, fallback):
+            """
+            Trích xuất giá trị số thực float từ dictionary tùy chọn, trả về giá trị dự phòng nếu lỗi.
+            """
             val = opts.get(key)
             if val is not None and str(val).strip() != "":
                 try:
@@ -298,12 +325,18 @@ class AMCProject:
             return fallback
 
         def _get_bool(key, fallback):
+            """
+            Trích xuất giá trị logic boolean (True/False) từ dictionary tùy chọn.
+            """
             val = opts.get(key)
             if val is not None and str(val).strip() != "":
                 return str(val).strip() in ("1", "true", "True", "yes")
             return fallback
 
         def _get_str(key, fallback):
+            """
+            Trích xuất giá trị chuỗi string từ dictionary tùy chọn.
+            """
             val = opts.get(key)
             if val is not None:
                 return val
@@ -354,10 +387,8 @@ class AMCProject:
             print(f"Error saving project preferences to {options_path}: {e}")
 
     def ensure_vietnamese_latex_support(self, tex_file_path: str):
-        """Add VnTeX support to UTF-8 subjects containing Vietnamese characters.
-
-        PDFLaTeX with T1 cannot render the Vietnamese-only Unicode range. VnTeX
-        supplies the T5 font encoding and UTF-8 mappings required by pdflatex.
+        """
+        Tự động thêm gói hỗ trợ tiếng Việt VnTeX cho tệp nguồn LaTeX nếu phát hiện ký tự có dấu.
         """
         source = Path(tex_file_path)
         try:
@@ -365,14 +396,13 @@ class AMCProject:
         except (OSError, UnicodeDecodeError):
             return
 
-        # Vietnamese letters (including dong/ohorn/uhorn and tone marks).
+
         if not re.search(r"[\u0102-\u0103\u0110-\u0111\u01A0-\u01B0\u1EA0-\u1EF9]", content):
             return
         if re.search(r"\\usepackage(?:\[[^\]]*\])?\{vntex\}", content):
             return
 
-        # Remove input/font encoding declarations first: VnTeX loads inputenc
-        # itself and selects T5. Keeping T1 would cause a package option clash.
+
         content = re.sub(r"^\s*\\usepackage(?:\[[^\]]*\])?\{inputenc\}\s*\n?", "", content, flags=re.MULTILINE)
         content = re.sub(r"^\s*\\usepackage(?:\[[^\]]*\])?\{fontenc\}\s*\n?", "", content, flags=re.MULTILINE)
         vntex_line = "% AMC-WEB: Vietnamese UTF-8 support\n\\usepackage[utf8]{vntex}\n"
@@ -384,6 +414,9 @@ class AMCProject:
         source.write_text(content, encoding="utf-8", newline="\n")
 
     def _run_amc(self, args: list, strict=True):
+        """
+        Thực thi lệnh gọi công cụ Auto Multiple Choice (AMC) qua subprocess.
+        """
         self.ensure_valid_options_file()
         print('Running: {}'.format(' '.join(args)))
         result = subprocess.run(args, capture_output=True, text=True, cwd=str(self.project_dir))
@@ -423,7 +456,6 @@ class AMCProject:
         ]
         self._run_amc(cmd_s, strict=False)
 
-        # Cứu file PDF và xy nếu AMC tạo nhầm tên (như trong amc-compiled.*)
         subject_pdf = self.project_dir / 'DOC-sujet.pdf'
         compiled_pdf = self.project_dir / 'amc-compiled.pdf'
         if not subject_pdf.exists() and compiled_pdf.exists():
@@ -446,8 +478,7 @@ class AMCProject:
 
     def prepare_scoring(self, tex_file_path: str):
         """
-        Chỉ chạy mode s để cập nhật lại barem điểm từ file .tex vào scoring.sqlite 
-        mà không cần tạo lại PDF giao diện bài thi.
+        Cập nhật lại thang điểm và đáp án từ tệp nguồn vào cơ sở dữ liệu scoring mà không tạo lại PDF.
         """
         print(f"[{self.project_dir.name}] STEP: Updating marking scale from {tex_file_path}")
         is_txt = Path(tex_file_path).suffix == '.txt'
@@ -464,9 +495,9 @@ class AMCProject:
 
     def compile_with_log(self, tex_file_path: str) -> dict:
         """
-        Compiles the LaTeX or AMC-TXT file and captures compiler errors.
+        Biên dịch tệp LaTeX hoặc AMC-TXT và ghi lại các lỗi biên dịch.
         """
-        # Only inject Vietnamese LaTeX support for .tex files
+
         if not tex_file_path.endswith('.txt'):
             self.ensure_vietnamese_latex_support(tex_file_path)
         
@@ -480,7 +511,7 @@ class AMCProject:
         success = True
         returncode = 0
         
-        # If it's a .tex file, run pdflatex directly first to get the raw compiler logs
+
         if not is_txt:
             pdflatex_cmd = [
                 "pdflatex", 
@@ -498,7 +529,7 @@ class AMCProject:
             success = (result.returncode == 0)
             returncode = result.returncode
 
-        # Now run AMC prepare to generate .xy layout files (and compile if it's TXT)
+
         if success or is_txt:
             amc_cmd = [
                 "auto-multiple-choice", "prepare",
@@ -534,6 +565,7 @@ class AMCProject:
             "log": log_output,
             "returncode": returncode
         }
+
     def meptex(self):
         """
         Bước 2: meptex
@@ -580,8 +612,7 @@ class AMCProject:
 
     def analyse_diagnostic(self, scan_file: str, scan_options: dict | None = None) -> Path:
         """
-        Runs AMC analyse in diagnostic mode for a single failed scan file,
-        producing a preprocessed visual image in cr/diagnostic/<scan>.png.
+        Phân tích tệp ảnh quét ở chế độ chẩn đoán để tạo ảnh trực quan hỗ trợ xử lý lỗi nhận dạng.
         """
         clean_name = Path(scan_file).name
         target_scan_file = self.scans_dir / clean_name
@@ -620,7 +651,6 @@ class AMCProject:
         print(f"[{self.project_dir.name}] Running diagnostic analyse on {clean_name}")
         self._run_amc(cmd, strict=False)
 
-        # Check for produced diagnostic image
         diag_files = list(diag_dir.glob(f"{clean_name}*"))
         if diag_files:
             return diag_files[0]
@@ -630,7 +660,9 @@ class AMCProject:
         raise FileNotFoundError(f"Diagnostic image was not produced for {clean_name}")
 
     def _has_latex_scoring_definition(self) -> bool:
-        """Whether AMC extracted a non-default scoring strategy from the LaTeX subject."""
+        """
+        Kiểm tra xem trong cơ sở dữ liệu đã có chiến lược chấm điểm tùy chỉnh từ LaTeX hay chưa.
+        """
         database = self.data_dir / "scoring.sqlite"
         if not database.exists():
             return False
@@ -654,7 +686,7 @@ class AMCProject:
 
     def clear_external_scores(self):
         """
-        Deletes all external scores from the scoring database.
+        Xóa tất cả điểm số bên ngoài khỏi cơ sở dữ liệu điểm số.
         """
         database = self.data_dir / "scoring.sqlite"
         if not database.exists():
@@ -664,7 +696,6 @@ class AMCProject:
         try:
             connection = sqlite3.connect(database)
             cursor = connection.cursor()
-            # The table might not exist if no external scores have been imported yet
             cursor.execute("CREATE TABLE IF NOT EXISTS scoring_external (student INTEGER, copy INTEGER, question INTEGER, score REAL, PRIMARY KEY (student,copy,question))")
             cursor.execute("DELETE FROM scoring_external")
             connection.commit()
@@ -677,7 +708,7 @@ class AMCProject:
 
     def get_anonymity_status(self):
         """
-        Returns statistics about anonymized sheets and external scores.
+        Trả về số liệu thống kê về các bảng tính ẩn danh và điểm số từ bên ngoài.
         """
         status = {
             "sheets": 0,
@@ -685,18 +716,16 @@ class AMCProject:
             "students": 0
         }
         
-        # Count PDFs in anonymous directory
+
         if self.anonymous_dir.exists():
             status["sheets"] = len(list(self.anonymous_dir.glob("*.pdf")))
             
-        # Count scores and students in external table
         database = self.data_dir / "scoring.sqlite"
         if database.exists():
             import sqlite3
             try:
                 connection = sqlite3.connect(database)
                 cursor = connection.cursor()
-                # Check if table exists
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='scoring_external'")
                 if cursor.fetchone():
                     cursor.execute("SELECT count(*), count(DISTINCT student) FROM scoring_external")
@@ -711,7 +740,9 @@ class AMCProject:
         return status
 
     def is_postcorrect(self) -> bool:
-        """Checks whether the exam was compiled with postcorrect option."""
+        """
+        Kiểm tra xem bài thi có được biên soạn với tùy chọn sửa lỗi sau khi làm bài (post-correct) hay không.
+        """
         database = self.data_dir / "scoring.sqlite"
         if not database.exists():
             return False
@@ -726,7 +757,9 @@ class AMCProject:
             return False
 
     def get_postcorrect_sheets(self) -> list[dict]:
-        """Returns the list of scanned sheets (student, copy) available for postcorrect."""
+        """
+        Trả về danh sách các tờ đã quét (bài làm của học sinh, bản sao) có sẵn để thực hiện chấm lại.
+        """
         database = self.data_dir / "capture.sqlite"
         if not database.exists():
             return []
@@ -757,10 +790,10 @@ class AMCProject:
 
     def get_marks_table(self) -> dict:
         """
-        Retrieves the temporary marks table matching AMC::Gui::Notes.
-        Returns:
-            columns: list of question titles
-            rows: list of { exam, student, copy, mark, is_teacher, scores }
+        Lấy bảng điểm tạm thời tương ứng với AMC::Gui::Notes.
+        Trả về:
+            columns: danh sách các tiêu đề câu hỏi
+            rows: danh sách các phần tử dạng { exam, student, copy, mark, is_teacher, scores }
             mean: { exam: "mean", mark: mean_mark, scores: { [question]: "XX%" } }
         """
         database = self.data_dir / "scoring.sqlite"
@@ -774,7 +807,7 @@ class AMCProject:
             conn = sqlite3.connect(database)
             conn.row_factory = sqlite3.Row
 
-            # Check postcorrect variables
+
             vars_dict = dict(conn.execute("SELECT name, value FROM scoring_variables").fetchall())
             is_pc = vars_dict.get("postcorrect_flag") == "1"
             pc_student = -1
@@ -786,8 +819,7 @@ class AMCProject:
                 except (ValueError, TypeError):
                     pass
 
-            # Questions: get from scoring_question joined with scoring_title
-            # Filter out code digit patterns (e.g. student_id:1)
+
             raw_questions = conn.execute("""
                 SELECT q.question, t.title, q.indicative
                 FROM scoring_question q
@@ -799,10 +831,10 @@ class AMCProject:
             questions = [q for q in raw_questions if not re.search(r':\d+$', q["title"])]
             question_cols = [q["title"] for q in questions]
 
-            # Student marks
+    
             marks = conn.execute("SELECT student, copy, total, max, mark FROM scoring_mark ORDER BY student, copy").fetchall()
 
-            # Question scores map
+            
             scores_rows = conn.execute("SELECT student, copy, question, score, max FROM scoring_score").fetchall()
             scores_map = {}
             for r in scores_rows:
@@ -832,7 +864,7 @@ class AMCProject:
                     "scores": q_scores
                 })
 
-            # Mean row
+            
             if is_pc and pc_student >= 0:
                 mean_mark_row = conn.execute(
                     "SELECT AVG(mark) FROM scoring_mark WHERE NOT (student=? AND copy=?)",
@@ -935,7 +967,7 @@ class AMCProject:
 
         self._run_amc(cmd, strict=False)
 
-        # Sync mark_max in scoring_variables
+       
         try:
             import sqlite3
             scoring_db = self.data_dir / 'scoring.sqlite'
@@ -957,13 +989,15 @@ class AMCProject:
             "auto-multiple-choice", "association-auto",
             "--data", str(self.data_dir),
             "--liste", csv_file_path,
-            "--liste-key", "id",       # Tên cột trong CSV chứa ID
-            "--notes-id", "student"    # Code nhận diện trên bài làm
+            "--liste-key", "id",       
+            "--notes-id", "student"    
         ]
         self._run_amc(cmd, strict=False)
 
     def association_auto_with_options(self, csv_file_path: str, primary_key: str, code_name: str):
-        """Associate decoded AMCcode values with a chosen CSV key column."""
+        """
+        Liên kết các giá trị mã AMC đã giải mã với một cột khóa CSV được chọn.
+        """
         print(f"[{self.project_dir.name}] Automatic association using {code_name} -> {primary_key}")
         cmd = [
             "auto-multiple-choice", "association-auto",
@@ -1002,12 +1036,12 @@ class AMCProject:
 
     def anonymize(self, settings: dict):
         """
-        Generates anonymized PDFs for each student based on the Anonymization settings.
+        Tạo các tệp PDF đã ẩn danh cho từng học sinh dựa trên các cài đặt ẩn danh hóa.
         """
         header_annotations = settings.get('header_annotations', '%(aID)')
         anonymous_id_model = settings.get('anonymous_id_model', 'edddds')
         
-        # Ensure anonymous dir exists
+
         self.anonymous_dir.mkdir(parents=True, exist_ok=True)
         cmd = [
             "auto-multiple-choice", "annotate",
@@ -1029,6 +1063,9 @@ class AMCProject:
         return self._run_amc(cmd)
     
     def import_external_scores(self, csv_file_path: str):
+        """
+        Nhập điểm số từ tệp CSV bên ngoài vào cơ sở dữ liệu điểm của dự án.
+        """
         cmd = [
             "auto-multiple-choice", "external",
             "--data", str(self.data_dir),
@@ -1041,7 +1078,6 @@ class AMCProject:
 
 
 if __name__ == "__main__":
-    # Test script: Khởi tạo một project thử nghiệm
     workspace_dir = os.path.dirname(os.path.abspath(__file__))
     projects_dir = os.path.join(workspace_dir, "MC-Projects")
     

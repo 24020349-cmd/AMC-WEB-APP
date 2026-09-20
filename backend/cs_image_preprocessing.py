@@ -5,7 +5,7 @@ import time
 
 
 def image_transform(img: np.array, markers_coordinates: list[list[float]]) -> np.array:
-    # Read Image
+    # Đọc ảnh đầu vào
     standard_width = 1240
     standard_height = 1754
     padding = 60

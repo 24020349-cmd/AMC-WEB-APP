@@ -7,7 +7,7 @@ app = FastAPI(title="AMC Web API", version="1.0.0")
 # Cấu hình CORS để cho phép Frontend kết nối
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Trong thực tế nên giới hạn lại
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
