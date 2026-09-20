@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Markers']
+
+roboflow:
+  workspace: 24020349-v-nh-tun-s-workspace
+  project: amc-web-app-rdnvs
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/24020349-v-nh-tun-s-workspace/amc-web-app-rdnvs/dataset/1

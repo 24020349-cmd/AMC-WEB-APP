@@ -1,0 +1,77 @@
+\documentclass[a4paper]{article}
+
+% Hỗ trợ tiếng Việt Unicode
+\usepackage[utf8]{vntex}
+
+% KÍCH HOẠT POSTCORRECT: Thêm tùy chọn 'postcorrect' vào gói automultiplechoice
+\usepackage[box,completemulti,postcorrect]{automultiplechoice}    
+
+\begin{document}
+
+% Số lượng bản đề thi: Tạo 3 bản
+% Bản 1 (Sheet 1): Dành cho Giáo viên tô đáp án đúng làm bài mẫu (Answer key)
+% Bản 2, Bản 3 (Sheet 2, 3): Dành cho Học sinh làm bài
+%
+% QUAN TRỌNG: Với postcorrect, KHÔNG xáo trộn câu hỏi/đáp án (không dùng \shufflegroup)
+% để cấu trúc các bản đề hoàn toàn trùng khớp với bài chấm mẫu.
+\onecopy{3}{    
+
+\noindent{\bf BÀI KIỂM TRA ĐỊNH KỲ \hfill POSTCORRECT}
+
+\vspace*{.5cm}
+\begin{minipage}{.4\linewidth}
+\centering\large\bf Đề thi trắc nghiệm\\ Môn: Kiến thức chung\end{minipage}
+\namefield{\fbox{    
+                \begin{minipage}{.5\linewidth}
+                  Họ và tên:
+
+                  \vspace*{.5cm}\namefielddots   
+                  \vspace*{1mm}
+                \end{minipage}
+         }}
+
+\vspace{1ex}
+
+% --- CHÚ Ý ĐẶC BIỆT VỀ ĐÁP ÁN: ---
+% Trong chế độ postcorrect, file LaTeX KHÔNG CẦN và KHÔNG DÙNG đáp án đúng.
+% Tất cả các lựa chọn bên dưới ĐỀU ĐƯỢC ĐẶT LÀ \wrongchoice!
+% Đáp án đúng thực sự sẽ do Giáo viên cầm bút tự tô lên Tờ số 1 (Sheet 1).
+
+% --- CÂU HỎI 1 ---
+\begin{question}{q1}    
+  Thủ đô của Việt Nam là thành phố nào?
+  \begin{choices}
+    \wrongchoice{Hà Nội}
+    \wrongchoice{TP. Hồ Chí Minh}
+    \wrongchoice{Đà Nẵng}
+    \wrongchoice{Huế}
+  \end{choices}
+\end{question}
+
+% --- CÂU HỎI 2 ---
+\begin{question}{q2}    
+  Số nguyên tố chẵn duy nhất là số nào?
+  \begin{choices}
+    \wrongchoice{0}
+    \wrongchoice{1}
+    \wrongchoice{2}
+    \wrongchoice{4}
+  \end{choices}
+\end{question}
+
+% --- CÂU HỎI 3: Câu hỏi nhiều lựa chọn ---
+% Khi chấm điểm, nếu Giáo viên tô 2 đáp án (Trung Quốc và Lào) trên tờ bài mẫu,
+% AMC sẽ tự động coi 2 đáp án đó là đáp án đúng!
+\begin{questionmult}{q3}    
+  Những quốc gia nào giáp biên giới trên đất liền với Việt Nam?
+  \begin{choices}
+    \wrongchoice{Trung Quốc}
+    \wrongchoice{Lào}
+    \wrongchoice{Campuchia}
+    \wrongchoice{Thái Lan}
+  \end{choices}
+\end{questionmult}
+
+}
+
+\end{document}

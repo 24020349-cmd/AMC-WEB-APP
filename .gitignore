@@ -1,0 +1,43 @@
+# Node & Frontend dependencies and builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+dist/
+
+# Python cache & virtual environments
+**/__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.pytest_cache/
+
+# AMC Projects & Scan data (Keep folder structures via .gitkeep, ignore individual projects)
+MC-Projects/*
+!MC-Projects/.gitkeep
+backend/MC-Projects/*
+!backend/MC-Projects/.gitkeep
+
+# Temporary, evaluation, and scratch files
+tmp/
+backend/tmp/
+.deepeval/
+check.js
+
+# Logs and local config files
+*.log
+backend/bad.log
+*.local
+*.local.json
+.env
+
+# Model training runs / heavy cache
+LLM_CV_Models/runs/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
