@@ -76,6 +76,9 @@ DEFAULT_SETTINGS = {
 }
 
 def display_path(path: Path) -> str:
+    """
+    Chuyển đổi đường dẫn tuyệt đối sang dạng chuỗi hiển thị chuẩn hóa cho người dùng.
+    """
     if path.resolve() == DEFAULT_PROJECTS_ROOT.resolve():
         return "MC-Projects"
     try:
@@ -84,6 +87,9 @@ def display_path(path: Path) -> str:
         return str(path.resolve())
 
 def resolve_projects_directory(value: str | None) -> Path:
+    """
+    Xác định và giải quyết đường dẫn thư mục gốc chứa các dự án AMC trên hệ thống.
+    """
     if not value or not value.strip():
         return DEFAULT_PROJECTS_ROOT
     normalized = value.strip().replace("\\", "/").strip("/")
@@ -97,6 +103,9 @@ def resolve_projects_directory(value: str | None) -> Path:
     return candidate.resolve()
 
 def load_settings() -> dict:
+    """
+    Tải toàn bộ cài đặt ứng dụng từ tệp cấu hình app_settings.json.
+    """
     settings = DEFAULT_SETTINGS.copy()
     if SETTINGS_PATH.exists():
         try:
@@ -114,9 +123,15 @@ def load_settings() -> dict:
     return settings
 
 def save_settings(settings: dict):
+    """
+    Lưu các cài đặt ứng dụng vào tệp cấu hình app_settings.json.
+    """
     SETTINGS_PATH.write_text(json.dumps(settings, indent=2), encoding='utf-8')
 
 def refresh_projects_root():
+    """
+    Cập nhật và áp dụng thư mục gốc lưu trữ dự án mới vào cấu hình hệ thống.
+    """
     global PROJECTS_ROOT
     PROJECTS_ROOT = Path(load_settings()["projects_directory"])
     PROJECTS_ROOT.mkdir(parents=True, exist_ok=True)
@@ -165,6 +180,9 @@ class PreferencesUpdate(BaseModel):
 
 
 def preferences_payload() -> dict:
+    """
+    Định dạng dữ liệu cài đặt thành payload tiêu chuẩn cho giao diện Preferences.
+    """
     settings = load_settings()
     return {
         "latex_models_directory": "Models",
@@ -213,11 +231,17 @@ def preferences_payload() -> dict:
 
 @router.get("/preferences")
 def get_preferences():
+    """
+    API lấy thông tin toàn bộ các thiết lập tùy chọn toàn cục của ứng dụng.
+    """
     refresh_projects_root()
     return preferences_payload()
 
 @router.put("/preferences")
 def update_preferences(update: PreferencesUpdate):
+    """
+    API cập nhật các thiết lập tùy chọn toàn cục và lưu vào hệ thống.
+    """
     try:
         settings = load_settings()
         changes = update.dict(exclude_none=True)
@@ -315,12 +339,18 @@ class ProjectPreferencesUpdate(BaseModel):
 
 @router.get("/{name}/preferences")
 def get_project_preferences(name: str):
+    """
+    API lấy các cài đặt cấu hình riêng của một dự án cụ thể từ options.xml.
+    """
     project = get_amc_project(name)
     settings = load_settings()
     return project.get_project_preferences(global_defaults=settings)
 
 @router.post("/{name}/preferences")
 def update_project_preferences(name: str, update: ProjectPreferencesUpdate):
+    """
+    API cập nhật các thiết lập cấu hình riêng áp dụng cho dự án hiện tại.
+    """
     project = get_amc_project(name)
     data = update.model_dump(exclude_unset=True)
     project.set_project_preferences(data)
@@ -338,6 +368,9 @@ class TestEmailRequest(BaseModel):
 
 @router.post("/preferences/test_email")
 def test_email_connection(req: TestEmailRequest):
+    """
+    API kiểm tra kết nối SMTP gửi email thử nghiệm với tài khoản được cấu hình.
+    """
     settings = load_settings()
     host = req.smtp_host or settings.get("email_smtp_host", "smtp.gmail.com")
     port = req.smtp_port or int(settings.get("email_smtp_port", 465))
@@ -403,6 +436,9 @@ def test_email_connection(req: TestEmailRequest):
 
 @router.post("/preferences/select_projects_directory")
 def select_projects_directory():
+    """
+    API mở hộp thoại hệ thống cho phép người dùng chọn thư mục lưu trữ dự án.
+    """
     if os.name != 'nt':
         raise HTTPException(status_code=501, detail="Native folder selection requires the backend to run on Windows.")
     try:
@@ -435,6 +471,9 @@ class ProjectCreate(BaseModel):
 
 @router.get("/")
 def list_projects():
+    """
+    API lấy danh sách tất cả các dự án AMC hiện có trong thư mục quản lý.
+    """
     try:
         projects = []
         for entry in os.scandir(PROJECTS_ROOT):
@@ -449,7 +488,9 @@ def list_projects():
 
 @router.get("/templates")
 def list_templates():
-    """Lấy danh sách file mẫu trong thư mục models/"""
+    """
+    API lấy danh sách các tệp đề thi mẫu sẵn có trong thư mục models.
+    """
     try:
         templates = []
         if MODELS_ROOT.exists():
@@ -462,19 +503,20 @@ def list_templates():
 
 @router.post("/")
 def create_project(project: ProjectCreate):
+    """
+    API khởi tạo một dự án AMC mới từ đầu hoặc từ tệp mẫu có sẵn.
+    """
     try:
-        # Khởi tạo thư mục dự án AMC (và các DB sqlite)
+
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=project.name)
         amc_proj.create()
         
-        # Đường dẫn file tex đích trong project
-        # Target extension depends on the template or file content, defaulting to .tex
+
         ext = ".tex"
         if project.source_type == 'template' and project.template_name:
             if project.template_name.endswith('.txt'):
                 ext = ".txt"
         elif project.source_type == 'file' and project.file_content:
-            # Assume .tex unless we add logic, but we could check the file extension if provided
             pass
             
         target_file = amc_proj.project_dir / f"{project.name}{ext}"
@@ -516,6 +558,9 @@ class MarkRequest(BaseModel):
     postcorrect_set_multiple: Optional[bool] = None
 
 def get_amc_project(name: str) -> AMCProject:
+    """
+    Hàm phụ trợ lấy đối tượng dự án AMCProject tương ứng theo tên dự án.
+    """
     project_dir = PROJECTS_ROOT / name
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail="Project not found")
@@ -523,6 +568,9 @@ def get_amc_project(name: str) -> AMCProject:
 
 @router.delete("/{name}")
 def delete_project(name: str):
+    """
+    API xóa vĩnh viễn một dự án và toàn bộ dữ liệu liên quan.
+    """
     amc_proj = get_amc_project(name)
     try:
         amc_proj.delete()
@@ -534,6 +582,9 @@ def delete_project(name: str):
 
 @router.post("/{name}/rename")
 def rename_project(name: str, new_name: str = Body(...)):
+    """
+    API đổi tên một dự án và cập nhật lại đường dẫn tệp nguồn.
+    """
     amc_proj = get_amc_project(name)
     try:
         amc_proj.rename(new_name)
@@ -547,6 +598,9 @@ def rename_project(name: str, new_name: str = Body(...)):
 
 @router.post("/{name}/copy")
 def copy_project(name: str, new_name: str = Body(...)):
+    """
+    API sao chép nhân bản một dự án sang tên dự án mới.
+    """
     amc_proj = get_amc_project(name)
     try:
         amc_proj.copy(new_name)
@@ -558,6 +612,9 @@ def copy_project(name: str, new_name: str = Body(...)):
 
 @router.get("/{name}/export")
 def export_project(name: str):
+    """
+    API nén toàn bộ dự án thành tệp ZIP để người dùng tải về lưu trữ.
+    """
     import tempfile
     amc_proj = get_amc_project(name)
     temp_dir = tempfile.mkdtemp()
@@ -566,6 +623,9 @@ def export_project(name: str):
         zip_path = amc_proj.export_zip(temp_dir)
         
         def cleanup_temp():
+            """
+            Hàm tác vụ nền xóa tệp nén tạm thời sau khi người dùng tải về hoàn tất.
+            """
             shutil.rmtree(temp_dir, ignore_errors=True)
             
         return FileResponse(
@@ -587,9 +647,11 @@ class TemplateExportRequest(BaseModel):
 
 @router.post("/{name}/export_template")
 def export_template_endpoint(name: str, payload: TemplateExportRequest):
+    """
+    API xuất dự án thành mẫu đề thi ZIP và lưu vào thư mục models.
+    """
     amc_proj = get_amc_project(name)
     try:
-        # Export thẳng vào thư mục models/ (ngoài cùng của dự án)
         amc_proj.export_zip_template(
             dest_dir=str(MODELS_ROOT),
             file_name=payload.file_name,
@@ -608,6 +670,9 @@ class CleanupRequest(BaseModel):
 
 @router.get("/{name}/cleanup_info")
 def get_cleanup_info(name: str):
+    """
+    API kiểm tra dung lượng các tệp trung gian có thể dọn dẹp để giải phóng bộ nhớ.
+    """
     try:
         amc_proj = get_amc_project(name)
         return amc_proj.get_cleanup_info()
@@ -616,6 +681,9 @@ def get_cleanup_info(name: str):
 
 @router.post("/{name}/cleanup")
 def cleanup_project(name: str, payload: CleanupRequest):
+    """
+    API dọn dẹp và xóa các tệp trung gian đã chọn để tiết kiệm dung lượng ổ đĩa.
+    """
     try:
         amc_proj = get_amc_project(name)
         amc_proj.cleanup(
@@ -631,6 +699,9 @@ def cleanup_project(name: str, payload: CleanupRequest):
 
 @router.get("/{name}/marking_status")
 def get_marking_status(name: str):
+    """
+    API lấy trạng thái chấm bài thi (đã chấm chưa, số bài đã chấm, thời gian cập nhật).
+    """
     amc_proj = get_amc_project(name)
     db_path = amc_proj.data_dir / "scoring.sqlite"
     if not db_path.exists():
@@ -651,11 +722,17 @@ def get_marking_status(name: str):
 
 @router.get("/{name}/marks_table")
 def get_marks_table(name: str):
+    """
+    API lấy bảng điểm chi tiết của tất cả thí sinh theo từng câu hỏi.
+    """
     amc_proj = get_amc_project(name)
     return amc_proj.get_marks_table()
 
 @router.get("/{name}/status")
 def get_project_status(name: str):
+    """
+    API lấy trạng thái tổng thể của dự án (số bài quét, bố cục, dữ liệu điểm, tệp CSV).
+    """
     amc_proj = get_amc_project(name)
     sujet_path = amc_proj.project_dir / "DOC-sujet.pdf"
     layout_path = amc_proj.data_dir / "layout.sqlite"
@@ -690,6 +767,9 @@ def get_project_status(name: str):
 
 @router.post("/{name}/mark")
 def mark_project(name: str, payload: MarkRequest):
+    """
+    API thực hiện chấm bài thi tự động dựa trên cài đặt thang điểm và barem đáp án.
+    """
     amc_proj = get_amc_project(name)
     if not amc_proj.project_dir.exists():
         raise HTTPException(status_code=404, detail="Project not found")
@@ -717,6 +797,9 @@ def mark_project(name: str, payload: MarkRequest):
 
 @router.get("/{name}/postcorrect_status")
 def get_postcorrect_status(name: str):
+    """
+    API kiểm tra trạng thái và thông tin bài thi mẫu chuẩn (post-correct).
+    """
     amc_proj = get_amc_project(name)
     if not amc_proj.project_dir.exists():
         raise HTTPException(status_code=404, detail="Project not found")
@@ -801,7 +884,9 @@ class AnnotatePapersRequest(BaseModel):
     filename_model: Optional[str] = None
 
 def format_filename_model(model: Optional[str], candidate: dict) -> str:
-    """Substitute (N), (ID), and CSV column tokens from filename model."""
+    """
+    Hàm định dạng tên tệp kết quả dựa trên mẫu quy tắc đặt tên và thông tin thí sinh.
+    """
     pattern = model.strip() if model and model.strip() else '(N)-(ID)'
     exam = candidate.get('exam', 1)
     copy = candidate.get('copy', 0)
@@ -826,14 +911,18 @@ def format_filename_model(model: Optional[str], candidate: dict) -> str:
     return res
 
 def get_project_file(project: AMCProject, filename: str, suffix: str | None = None) -> Path:
-    """Resolve a project-owned file without permitting traversal outside the project."""
+    """
+    Hàm giải quyết đường dẫn tệp an toàn trong phạm vi thư mục của dự án.
+    """
     candidate = (project.project_dir / filename).resolve()
     if candidate.parent != project.project_dir.resolve() or (suffix and candidate.suffix.lower() != suffix):
         raise HTTPException(status_code=400, detail="Invalid project file")
     return candidate
 
 def get_amc_code_declarations(project: AMCProject) -> dict[str, int]:
-    """Read numeric identifiers declared as \\AMCcode{name}{digits} from the subject."""
+    """
+    Hàm đọc các khai báo mã nhận dạng thí sinh (AMCcode) từ tệp mã nguồn đề thi.
+    """
     tex_files = [path for path in project.project_dir.glob('*.tex') if not path.name.startswith('amc-compiled')]
     declarations: dict[str, int] = {}
     for tex_file in tex_files:
@@ -846,7 +935,9 @@ def get_amc_code_declarations(project: AMCProject) -> dict[str, int]:
     return declarations
 
 def get_association_status(project: AMCProject, primary_key: str) -> dict:
-    """Merge AMC automatic association with this app's image-based manual mapping."""
+    """
+    Hàm lấy trạng thái liên kết tự động và thủ công giữa bài làm đã quét và danh sách học sinh.
+    """
     capture_path = project.data_dir / 'capture.sqlite'
     if not capture_path.exists():
         return {"total": 0, "matched": 0, "missing": 0, "automatic": 0, "automatic_run": False, "codes": {}}
@@ -902,18 +993,27 @@ def get_association_status(project: AMCProject, primary_key: str) -> dict:
 
 @router.get("/{name}/csv_files")
 def list_csv_files(name: str):
+    """
+    API lấy danh sách các tệp danh sách học sinh (.csv) có trong dự án.
+    """
     amc_proj = get_amc_project(name)
     csv_files = [f.name for f in amc_proj.project_dir.glob("*.csv") if f.is_file()]
     return {"files": csv_files}
 
 @router.get("/{name}/automatic_association_codes")
 def get_automatic_association_codes(name: str):
+    """
+    API lấy danh sách các trường mã số học sinh nhận diện được từ đề thi.
+    """
     project = get_amc_project(name)
     declarations = get_amc_code_declarations(project)
     return {"codes": [{"name": code_name, "digits": digits} for code_name, digits in declarations.items()]}
 
 @router.post("/{name}/automatic_association")
 def run_automatic_association(name: str, request: AutomaticAssociationRequest):
+    """
+    API thực hiện liên kết tự động bài thi với danh sách học sinh theo cột khóa định danh.
+    """
     project = get_amc_project(name)
     csv_path = get_project_file(project, request.csv_file, '.csv')
     if not csv_path.exists():
@@ -952,6 +1052,9 @@ def run_automatic_association(name: str, request: AutomaticAssociationRequest):
 
 @router.get("/{name}/csv_headers")
 def get_csv_headers(name: str, file: str):
+    """
+    API lấy danh sách các tiêu đề cột từ tệp danh sách học sinh CSV.
+    """
     amc_proj = get_amc_project(name)
     csv_path = get_project_file(amc_proj, file, '.csv')
     if not csv_path.exists():
@@ -966,6 +1069,9 @@ def get_csv_headers(name: str, file: str):
 
 @router.get("/{name}/csv")
 def get_csv_file(name: str, file: str):
+    """
+    API đọc nội dung toàn bộ tệp danh sách học sinh CSV dưới dạng văn bản.
+    """
     amc_proj = get_amc_project(name)
     csv_path = get_project_file(amc_proj, file, '.csv')
     if not csv_path.exists():
@@ -980,6 +1086,9 @@ def get_csv_file(name: str, file: str):
 
 @router.put("/{name}/csv")
 def update_csv_file(name: str, file: str, update: CsvUpdate):
+    """
+    API cập nhật nội dung văn bản mới cho tệp danh sách học sinh CSV.
+    """
     amc_proj = get_amc_project(name)
     csv_path = get_project_file(amc_proj, file, '.csv')
     headers = [header.strip() for header in update.headers]
@@ -998,7 +1107,9 @@ def update_csv_file(name: str, file: str, update: CsvUpdate):
 
 @router.post("/{name}/reports/marks_export")
 def export_marks(name: str, request: MarksExportRequest):
-    """Build a project CSV with the computed marks and score for every question."""
+    """
+    API xuất bảng điểm bài thi ra tệp bảng tính (CSV, PDF, ODS) theo các tùy chọn cấu hình.
+    """
     amc_proj = get_amc_project(name)
     csv_path = get_project_file(amc_proj, request.csv_file, '.csv')
     scoring_path = amc_proj.data_dir / 'scoring.sqlite'
@@ -1078,7 +1189,7 @@ def export_marks(name: str, request: MarksExportRequest):
             exported_rows.sort(key=lambda row: (row['mark'] is None or row['mark'] == '', float(row['mark']) if row['mark'] not in (None, '') else 0, str(row['exam'])))
         elif request.sorting == 'mark_descending':
             exported_rows.sort(key=lambda row: (row['mark'] is None or row['mark'] == '', -(float(row['mark'])) if row['mark'] not in (None, '') else 0, str(row['exam'])))
-        else:  # exam_copy_number
+        else:  
             exported_rows.sort(key=lambda row: (str(row['exam']), str(row['copy'])))
 
         amc_proj.exports_dir.mkdir(parents=True, exist_ok=True)
@@ -1086,13 +1197,12 @@ def export_marks(name: str, request: MarksExportRequest):
         if request.separator not in (',', ';'):
             raise HTTPException(status_code=400, detail="Separator must be a comma or semicolon")
 
-        # Determine output columns
+
         selected_cols = request.export_columns
         with open(output_path, 'w', encoding='utf-8-sig', newline='') as output_file:
             writer = csv.writer(output_file, delimiter=request.separator)
             
             if selected_cols:
-                # Custom columns requested
                 headers = []
                 for c in selected_cols:
                     if c in ('<student copy>', 'student.copy'):
@@ -1145,6 +1255,9 @@ def export_marks(name: str, request: MarksExportRequest):
 
 @router.post("/{name}/reports/open_exports_directory")
 def open_exports_directory(name: str):
+    """
+    API mở thư mục chứa các tệp xuất kết quả (exports) trên hệ điều hành.
+    """
     amc_proj = get_amc_project(name)
     amc_proj.exports_dir.mkdir(parents=True, exist_ok=True)
     if os.name != 'nt':
@@ -1156,6 +1269,9 @@ def open_exports_directory(name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 def get_matched_students(project: AMCProject, csv_file: str, primary_key: str):
+    """
+    Hàm lấy danh sách thí sinh đã được khớp thành công giữa bài thi và tệp CSV.
+    """
     csv_path = get_project_file(project, csv_file, '.csv')
     with open(csv_path, 'r', encoding='utf-8-sig', newline='') as handle:
         students = list(csv.DictReader(handle))
@@ -1169,7 +1285,9 @@ def get_matched_students(project: AMCProject, csv_file: str, primary_key: str):
     ]
 
 def prepend_subject_pages(project: AMCProject, target: Path, student: int, annotated_source: Path):
-    """Create a correction PDF with this student's original subject pages first."""
+    """
+    Hàm ghép trang đề thi gốc vào đầu tệp PDF bài chấm điểm của học sinh.
+    """
     output = fitz.open()
     subject_pdf = project.project_dir / 'DOC-sujet.pdf'
     layout_path = project.data_dir / 'layout.sqlite'
@@ -1191,6 +1309,9 @@ def prepend_subject_pages(project: AMCProject, target: Path, student: int, annot
 
 @router.get("/{name}/reports/annotate_candidates")
 def get_annotate_candidates(name: str, file: str, primary_key: str):
+    """
+    API lấy danh sách các thí sinh đủ điều kiện để tạo tệp PDF bài thi có chấm điểm.
+    """
     project = get_amc_project(name)
     try:
         candidates = get_matched_students(project, file, primary_key)
@@ -1202,12 +1323,18 @@ def get_annotate_candidates(name: str, file: str, primary_key: str):
 
 @router.get("/{name}/reports/annotate_options")
 def get_annotate_options(name: str):
+    """
+    API lấy các tùy chọn cấu hình chú thích điểm lên bài thi (vị trí, định dạng, tiêu đề).
+    """
     project = get_amc_project(name)
     model = project.get_option("modele_regroupement", "(N)-(ID)")
     return {"filename_model": model}
 
 @router.post("/{name}/reports/annotate_papers")
 def annotate_papers(name: str, request: AnnotatePapersRequest):
+    """
+    API thực hiện xuất các tệp PDF bài thi đã chấm điểm kèm chú thích lỗi sai cho từng học sinh.
+    """
     project = get_amc_project(name)
     try:
         if request.filename_model is not None:
@@ -1222,17 +1349,14 @@ def annotate_papers(name: str, request: AnnotatePapersRequest):
 
         corrections_dir = project.cr_dir / 'corrections' / 'pdf'
         corrections_dir.mkdir(parents=True, exist_ok=True)
-        # AMC keeps an existing correction when it considers it up to date.
-        # Remove only its unnamed intermediate files (for example 0001.pdf),
-        # never the application's final annotated-* exports, so it rebuilds
-        # annotations from the latest scanned pages and capture database.
+
         for existing in corrections_dir.glob('*.pdf'):
             if not existing.name.startswith('annotated-'):
                 try:
                     existing.unlink()
                 except Exception:
                     pass
-        # AMC creates annotated PDFs below cr/. The project CLI wrapper preserves AMC's native annotations.
+        
         amc_cmd = [
             'auto-multiple-choice', 'annotate', '--project', str(project.project_dir),
             '--data', str(project.data_dir), '--cr', str(project.cr_dir),
@@ -1242,13 +1366,12 @@ def annotate_papers(name: str, request: AnnotatePapersRequest):
             amc_cmd.extend(['--filename-model', request.filename_model.strip()])
         project._run_amc(amc_cmd, strict=True)
 
-        # AMC's native annotate command writes its per-copy PDFs to cr/corrections/pdf.
-        # Do not exclude that folder: it is the actual source for the final exports.
+
         generated = sorted(path for path in corrections_dir.glob('*.pdf') if not path.name.startswith('annotated-') and path.stat().st_size > 2_000)
         if not generated:
             raise HTTPException(status_code=500, detail="AMC did not generate usable annotated PDFs. Confirm that data capture and marking have completed, then review the AMC command output.")
 
-        # AMC output names vary by version. Keep the files it generated in the requested correction folder.
+       
         timestamp = int(time.time())
         outputs = []
         report_db = project.data_dir / 'report.sqlite'
@@ -1261,7 +1384,7 @@ def annotate_papers(name: str, request: AnnotatePapersRequest):
             source = matching[0] if matching else generated[min(index - 1, len(generated) - 1)]
             safe_value = re.sub(r'[^A-Za-z0-9._-]+', '_', candidate['value'])
 
-            # Determine filename from filename_model if per_student
+            
             if request.output_mode == 'per_student' and request.filename_model and request.filename_model.strip():
                 dest_filename = format_filename_model(request.filename_model, candidate)
             else:
@@ -1275,7 +1398,7 @@ def annotate_papers(name: str, request: AnnotatePapersRequest):
                     shutil.copy2(source, output)
             outputs.append(output)
 
-            # Ensure backward-compatible annotated- alias exists if custom model used
+            
             legacy_output = corrections_dir / f'annotated-{safe_value}-{candidate["exam"]}.pdf'
             if legacy_output.resolve() != output.resolve() and output.exists():
                 try:
@@ -1283,7 +1406,7 @@ def annotate_papers(name: str, request: AnnotatePapersRequest):
                 except Exception:
                     pass
 
-            # Register in report_student table
+            
             if rconn:
                 try:
                     rconn.execute("""
@@ -1317,11 +1440,17 @@ def annotate_papers(name: str, request: AnnotatePapersRequest):
 EMAIL_ADDRESS_PATTERN = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
 def is_valid_email_address(addr: str) -> bool:
+    """
+    Hàm kiểm tra tính hợp lệ của định dạng địa chỉ email.
+    """
     if not addr or not isinstance(addr, str):
         return False
     return bool(EMAIL_ADDRESS_PATTERN.match(addr.strip()))
 
 def find_email_columns(rows: List[dict]) -> tuple[List[str], str]:
+    """
+    Hàm tự động phát hiện các cột chứa địa chỉ email trong danh sách tiêu đề CSV.
+    """
     if not rows:
         return [], ""
     headers = list(rows[0].keys())
@@ -1336,6 +1465,9 @@ def find_email_columns(rows: List[dict]) -> tuple[List[str], str]:
     return list(counts.keys()), sorted_headers[0]
 
 def format_score_value(value: Optional[float], digits: int = 4) -> str:
+    """
+    Hàm định dạng giá trị điểm số thành chuỗi hiển thị gọn gàng.
+    """
     if value is None:
         return ""
     try:
@@ -1347,6 +1479,9 @@ def format_score_value(value: Optional[float], digits: int = 4) -> str:
         return str(value)
 
 def substitute_email_message(template: str, student_data: dict, exam_name: str, mark_info: dict) -> str:
+    """
+    Hàm thay thế các biến giữ chỗ (họ tên, điểm số, ID) trong tiêu đề và nội dung email.
+    """
     text = template
     text = re.sub(r'%s', format_score_value(mark_info.get('mark')), text)
     text = re.sub(r'%m', format_score_value(mark_info.get('mark_max')), text)
@@ -1355,6 +1490,9 @@ def substitute_email_message(template: str, student_data: dict, exam_name: str, 
     text = re.sub(r'%n', exam_name or '', text)
 
     def replace_col(match):
+        """
+        Hàm phụ trợ thay thế tên cột CSV trong chuỗi nội dung văn bản email.
+        """
         col = match.group(1).strip()
         if col in student_data:
             return str(student_data[col])
@@ -1379,11 +1517,14 @@ class MailingSendRequest(BaseModel):
 
 @router.get("/{name}/reports/mailing/preview")
 def preview_report_mailing(name: str, csv_file: Optional[str] = None, primary_key: Optional[str] = None):
+    """
+    API tạo bản xem trước danh sách email gửi báo cáo điểm thi và nội dung từng thư gửi học sinh.
+    """
     project = get_amc_project(name)
     settings = load_settings()
     sender_email = settings.get("email_sender", "").strip()
 
-    # 1. Prerequisite: Check sender email
+
     if not sender_email or not is_valid_email_address(sender_email):
         return {
             "status": "error",
@@ -1391,7 +1532,7 @@ def preview_report_mailing(name: str, csv_file: Optional[str] = None, primary_ke
             "message": "Bạn chưa điền email người gửi hoặc địa chỉ email không hợp lệ. Vui lòng vào Cài đặt (Preferences) -> tab Email để điền chính xác Email người gửi."
         }
 
-    # 2. Prerequisite: Check annotated PDFs
+
     corrections_dir = project.cr_dir / 'corrections' / 'pdf'
     report_db = project.data_dir / 'report.sqlite'
     has_annotated_pdfs = False
@@ -1414,7 +1555,7 @@ def preview_report_mailing(name: str, csv_file: Optional[str] = None, primary_ke
             "message": "Không tìm thấy bài làm đã chấm (PDF) nào để gửi. Vui lòng thực hiện chấm bài và tạo bài chấm (Annotate papers) trước."
         }
 
-    # 3. Prerequisite: Check students CSV and email columns
+
     available_csvs = [f.name for f in project.project_dir.glob("*.csv") if f.is_file()]
     resolved_csv = csv_file
     if not resolved_csv or resolved_csv in ('null', 'undefined'):
@@ -1460,7 +1601,7 @@ def preview_report_mailing(name: str, csv_file: Optional[str] = None, primary_ke
     if not resolved_pk or resolved_pk in ('null', 'undefined') or resolved_pk not in first_row_keys:
         resolved_pk = 'id' if 'id' in first_row_keys else (first_row_keys[0] if first_row_keys else 'id')
 
-    # Previous mailing statuses
+
     mail_statuses = {}
     if report_db.exists():
         try:
@@ -1477,7 +1618,7 @@ def preview_report_mailing(name: str, csv_file: Optional[str] = None, primary_ke
         except Exception:
             pass
 
-    # Scoring info
+    
     scoring_db = project.data_dir / 'scoring.sqlite'
     marks_by_exam = {}
     mark_max = 20.0
@@ -1571,6 +1712,9 @@ def preview_report_mailing(name: str, csv_file: Optional[str] = None, primary_ke
 
 @router.post("/{name}/reports/mailing/send")
 def send_report_mailing(name: str, req: MailingSendRequest):
+    """
+    API gửi email hàng loạt đính kèm bài thi đã chấm điểm và kết quả cho học sinh.
+    """
     project = get_amc_project(name)
     settings = load_settings()
 
@@ -1590,7 +1734,7 @@ def send_report_mailing(name: str, req: MailingSendRequest):
     if not req.selected_exams:
         raise HTTPException(status_code=400, detail="No students were selected for mailing.")
 
-    # Remember subject and body templates in settings
+    
     if req.subject:
         settings["df_annotatedemail_email_subject"] = req.subject
     if req.body:
@@ -1895,7 +2039,9 @@ def send_report_mailing(name: str, req: MailingSendRequest):
     }
 
 def extract_student_subject_pdf(project: AMCProject, student: int, target_path: Path):
-    """Slice pages belonging to student from DOC-sujet.pdf based on layout_page."""
+    """
+    Hàm trích xuất các trang đề thi tương ứng của từng học sinh từ tệp DOC-sujet.pdf.
+    """
     subject_pdf = project.project_dir / 'DOC-sujet.pdf'
     layout_db = project.data_dir / 'layout.sqlite'
     if not subject_pdf.exists() or not layout_db.exists():
@@ -1922,11 +2068,14 @@ def extract_student_subject_pdf(project: AMCProject, student: int, target_path: 
 
 @router.get("/{name}/preparation/mailing/preview")
 def preview_prep_mailing(name: str, csv_file: Optional[str] = None, primary_key: Optional[str] = None):
+    """
+    API tạo bản xem trước danh sách email gửi đề thi chuẩn bị cho thí sinh trước ngày thi.
+    """
     project = get_amc_project(name)
     settings = load_settings()
     sender_email = settings.get("email_sender", "").strip()
 
-    # 1. Check sender email
+    
     if not sender_email or not is_valid_email_address(sender_email):
         return {
             "status": "error",
@@ -1934,7 +2083,7 @@ def preview_prep_mailing(name: str, csv_file: Optional[str] = None, primary_key:
             "message": "Bạn chưa điền email người gửi hoặc địa chỉ email không hợp lệ. Vui lòng vào Cài đặt (Preferences) -> tab Email để điền chính xác Email người gửi."
         }
 
-    # 2. Check DOC-sujet.pdf & layout.sqlite
+   
     subject_pdf = project.project_dir / 'DOC-sujet.pdf'
     layout_db = project.data_dir / 'layout.sqlite'
     if not subject_pdf.exists() or not layout_db.exists():
@@ -1944,7 +2093,7 @@ def preview_prep_mailing(name: str, csv_file: Optional[str] = None, primary_key:
             "message": "Chưa tìm thấy file đề thi (DOC-sujet.pdf) hoặc dữ liệu bố cục bài thi. Vui lòng thực hiện cập nhật tài liệu (Update documents) và phát hiện bố cục (Layout detection) trước khi gửi đề thi."
         }
 
-    # 3. Check CSV & email columns
+    
     available_csvs = [f.name for f in project.project_dir.glob("*.csv") if f.is_file()]
     resolved_csv = csv_file
     if not resolved_csv or resolved_csv in ('null', 'undefined'):
@@ -2002,7 +2151,7 @@ def preview_prep_mailing(name: str, csv_file: Optional[str] = None, primary_key:
             "message": "Không tìm thấy thông tin trang đề thi trong cơ sở dữ liệu layout. Vui lòng thực hiện cập nhật tài liệu (Update documents)."
         }
 
-    # Read previous mailing status for REPORT_PRINTED_COPY (type = 3)
+    
     report_db = project.data_dir / 'report.sqlite'
     mail_statuses = {}
     if report_db.exists():
@@ -2088,6 +2237,9 @@ def preview_prep_mailing(name: str, csv_file: Optional[str] = None, primary_key:
 
 @router.post("/{name}/preparation/mailing/send")
 def send_prep_mailing(name: str, req: MailingSendRequest):
+    """
+    API gửi email hàng loạt đính kèm đề thi chuẩn bị (phiếu làm bài) cho thí sinh.
+    """
     project = get_amc_project(name)
     settings = load_settings()
 
@@ -2383,12 +2535,14 @@ def send_prep_mailing(name: str, req: MailingSendRequest):
 
 @router.post("/{name}/edit_csv")
 def edit_csv_file(name: str, payload: EditCsvRequest):
+    """
+    API hỗ trợ mở tệp CSV bằng ứng dụng chỉnh sửa bảng tính mặc định trên hệ thống.
+    """
     amc_proj = get_amc_project(name)
     csv_path = get_project_file(amc_proj, payload.filename, '.csv')
     if not csv_path.exists():
         raise HTTPException(status_code=404, detail="CSV file not found")
     try:
-        # Mở notepad mà không chặn tiến trình backend
         if os.name != "nt":
             raise HTTPException(status_code=501, detail="Notepad editing requires the backend to run on Windows.")
         subprocess.Popen(
@@ -2405,6 +2559,9 @@ def edit_csv_file(name: str, payload: EditCsvRequest):
 
 @router.post("/{name}/upload_csv")
 async def upload_csv_file(name: str, file: UploadFile = File(...)):
+    """
+    API tải lên tệp danh sách thí sinh CSV mới vào thư mục dự án.
+    """
     amc_proj = get_amc_project(name)
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
@@ -2419,7 +2576,9 @@ async def upload_csv_file(name: str, file: UploadFile = File(...)):
 
 @router.get("/{name}/manual_association")
 def get_manual_association(name: str, file: str, primary_key: str):
-    """Return scanned name fields, CSV values, and saved manual assignments."""
+    """
+    API lấy danh sách các bài thi chưa được liên kết tự động để ghép thủ công.
+    """
     amc_proj = get_amc_project(name)
     csv_path = get_project_file(amc_proj, file, '.csv')
     if not csv_path.exists():
@@ -2473,7 +2632,9 @@ def get_manual_association(name: str, file: str, primary_key: str):
 
 @router.get("/{name}/identification_status")
 def get_identification_status(name: str, primary_key: str):
-    """Count sheets still unmatched after automatic and manual association."""
+    """
+    API thống kê số lượng bài thi đã được nhận diện định danh và số bài còn chưa khớp.
+    """
     amc_proj = get_amc_project(name)
     try:
         status = get_association_status(amc_proj, primary_key)
@@ -2483,6 +2644,9 @@ def get_identification_status(name: str, primary_key: str):
 
 @router.get("/{name}/manual_namefield")
 def get_manual_namefield(name: str, student: int, page: Optional[int] = None, copy: int = 0):
+    """
+    API lấy ảnh cắt vùng ô điền họ tên học sinh trên bài quét phục vụ nhận diện thủ công.
+    """
     amc_proj = get_amc_project(name)
     db_path = amc_proj.data_dir / 'capture.sqlite'
     if not db_path.exists():
@@ -2518,6 +2682,9 @@ def get_manual_namefield(name: str, student: int, page: Optional[int] = None, co
 
 @router.post("/{name}/manual_association")
 def update_manual_association(name: str, update: ManualAssociationUpdate):
+    """
+    API lưu thông tin liên kết thủ công giữa bài làm của học sinh với mã định danh trong danh sách.
+    """
     amc_proj = get_amc_project(name)
     db_path = amc_proj.data_dir / 'capture.sqlite'
     if not db_path.exists():
@@ -2556,6 +2723,9 @@ class SourceUpdate(BaseModel):
 
 @router.get("/{name}/source")
 def get_project_source(name: str, format: str = None):
+    """
+    API đọc nội dung mã nguồn đề thi (.tex hoặc .txt) của dự án.
+    """
     try:
         project_dir = PROJECTS_ROOT / name
         if not project_dir.exists():
@@ -2584,12 +2754,15 @@ def get_project_source(name: str, format: str = None):
 
 @router.put("/{name}/source")
 def update_project_source(name: str, source: SourceUpdate):
+    """
+    API lưu nội dung mã nguồn đề thi (.tex hoặc .txt) sau khi người dùng chỉnh sửa.
+    """
     try:
         project_dir = PROJECTS_ROOT / name
         if not project_dir.exists():
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # Determine target format from request, or auto-detect from existing files
+        
         target_format = source.format
         if not target_format:
             target_format = 'txt' if (project_dir / f"{name}.txt").exists() else 'latex'
@@ -2604,7 +2777,7 @@ def update_project_source(name: str, source: SourceUpdate):
         with open(source_file, 'w', encoding='utf-8') as f:
             f.write(source.content)
         
-        # Remove the other format file if it exists to avoid confusion
+        
         if other_file.exists():
             other_file.unlink()
             
@@ -2618,6 +2791,9 @@ class CopiesUpdate(BaseModel):
 
 @router.get("/{name}/copies")
 def get_project_copies(name: str):
+    """
+    API lấy số lượng bản đề thi đã được cấu hình tạo ra.
+    """
     try:
         source_file_tex = PROJECTS_ROOT / name / f"{name}.tex"
         source_file_txt = PROJECTS_ROOT / name / f"{name}.txt"
@@ -2638,6 +2814,9 @@ def get_project_copies(name: str):
 
 @router.put("/{name}/copies")
 def update_project_copies(name: str, update: CopiesUpdate):
+    """
+    API cập nhật số lượng bản đề thi cần sinh cho dự án.
+    """
     try:
         source_file_tex = PROJECTS_ROOT / name / f"{name}.tex"
         source_file_txt = PROJECTS_ROOT / name / f"{name}.txt"
@@ -2666,6 +2845,9 @@ def update_project_copies(name: str, update: CopiesUpdate):
 
 @router.post("/{name}/anonymize")
 def anonymize_project(name: str):
+    """
+    API kích hoạt tiến trình ẩn danh hóa bài thi của học sinh cho dự án.
+    """
     try:
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=name)
         settings = load_settings()
@@ -2676,6 +2858,9 @@ def anonymize_project(name: str):
 
 @router.get("/{name}/anonymous_documents")
 def download_anonymous_documents(name: str):
+    """
+    API nén và tải về toàn bộ các tệp bài thi PDF đã được ẩn danh hóa.
+    """
     import zipfile
     import tempfile
     try:
@@ -2703,6 +2888,9 @@ def download_anonymous_documents(name: str):
 
 @router.post("/{name}/prepare")
 def prepare_project(name: str):
+    """
+    API thực hiện biên dịch đề thi nguồn, tạo các tệp PDF đề bài, đáp án và cơ sở dữ liệu bố cục.
+    """
     try:
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=name)
         source_file_tex = amc_proj.project_dir / f"{name}.tex"
@@ -2722,6 +2910,9 @@ def prepare_project(name: str):
 
 @router.post("/{name}/compile_log")
 def compile_project_with_log(name: str):
+    """
+    API biên dịch đề thi và trả về toàn bộ log biên dịch của pdflatex để hiển thị lỗi.
+    """
     try:
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=name)
         source_file_tex = amc_proj.project_dir / f"{name}.tex"
@@ -2737,6 +2928,9 @@ def compile_project_with_log(name: str):
 
 @router.post("/{name}/layout_detection")
 def layout_detection(name: str):
+    """
+    API kiểm tra và trích xuất tọa độ bố cục câu hỏi từ tệp .xy vào cơ sở dữ liệu.
+    """
     try:
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=name)
         amc_proj.meptex()
@@ -2761,6 +2955,9 @@ def layout_detection(name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 def generate_layout_pdf(project_dir: Path):
+    """
+    API tạo các tệp PDF tài liệu đề thi và đáp án nếu chưa tồn tại trên hệ thống.
+    """
     sujet_path = project_dir / "DOC-sujet.pdf"
     db_path = project_dir / "data" / "layout.sqlite"
     out_path = project_dir / "DOC-layout.pdf"
@@ -2774,20 +2971,15 @@ def generate_layout_pdf(project_dir: Path):
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         
-        # Draw Namefield (Blue)
+        
         try:
             cur.execute("SELECT student, page, xmin, xmax, ymin, ymax FROM layout_namefield")
             for row in cur.fetchall():
-                # AMC pages are 1-indexed for 'student' and 'page'? Wait, AMC 'page' is usually 1-indexed.
-                # PyMuPDF pages are 0-indexed. But AMC actually creates a single PDF with all students.
-                # We need to map student/page to the absolute page number in the PDF.
-                # Actually, layout_page table contains (student, page, subjectpage).
-                # subjectpage is the absolute page index (1-indexed).
                 pass
         except Exception:
-            pass # ignore if table doesn't exist
+            pass 
             
-        # Join with layout_page to get absolute page number and DPI for boxes
+
         try:
             query_box = '''
                 SELECT p.subjectpage, p.dpi, b.xmin, b.xmax, b.ymin, b.ymax
@@ -2807,11 +2999,11 @@ def generate_layout_pdf(project_dir: Path):
                         row['xmax'] * scale, 
                         row['ymax'] * scale
                     )
-                    page.draw_rect(rect, color=(1, 0, 0), width=1) # Red box
+                    page.draw_rect(rect, color=(1, 0, 0), width=1)
         except Exception as e:
             print("Error drawing box layout:", e)
                     
-        # Join with layout_page for namefield from layout_zone
+
         try:
             query_name = '''
                 SELECT p.subjectpage, p.dpi, z.xmin, z.xmax, z.ymin, z.ymax
@@ -2832,11 +3024,10 @@ def generate_layout_pdf(project_dir: Path):
                         row['xmax'] * scale, 
                         row['ymax'] * scale
                     )
-                    page.draw_rect(rect, color=(0, 0, 1), width=1.5) # Blue box
+                    page.draw_rect(rect, color=(0, 0, 1), width=1.5) 
         except Exception as e:
             print("Error drawing namefield layout (or table missing):", e)
             
-        # Join with layout_page for digits (ID block)
         try:
             query_digit = '''
                 SELECT p.subjectpage, p.dpi, d.xmin, d.xmax, d.ymin, d.ymax
@@ -2869,6 +3060,9 @@ def generate_layout_pdf(project_dir: Path):
 
 @router.get("/{name}/pdf/{pdf_type}")
 def download_pdf(name: str, pdf_type: str):
+    """
+    API tải về tệp PDF tương ứng của dự án (đề thi, đáp án, bài giải).
+    """
     project_dir = PROJECTS_ROOT / name
     if pdf_type == "sujet":
         file_path = project_dir / "DOC-sujet.pdf"
@@ -2897,6 +3091,9 @@ def download_pdf(name: str, pdf_type: str):
 
 @router.post("/{name}/capture")
 async def capture_scans(name: str, files: List[UploadFile] = File(...)):
+    """
+    API tải lên các tệp ảnh quét bài làm của học sinh và phân tích nhận diện tự động.
+    """
     project_dir = PROJECTS_ROOT / name
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail="Project not found")
@@ -2904,9 +3101,9 @@ async def capture_scans(name: str, files: List[UploadFile] = File(...)):
     scans_dir = project_dir / "scans"
     scans_dir.mkdir(exist_ok=True)
     
-    # Save uploaded files
+
     for file in files:
-        # Clean up any existing PNGs or PDFs in scans with the same base name
+
         base_name = os.path.splitext(file.filename)[0]
         for existing in scans_dir.glob(f"{base_name}*"):
             try:
@@ -2918,18 +3115,18 @@ async def capture_scans(name: str, files: List[UploadFile] = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # If it's a PDF, extract to PNG using pdftoppm (poppler)
+
         if file.filename.lower().endswith('.pdf'):
             try:
                 import subprocess
                 prefix = str(scans_dir / f"{file.filename}_page")
                 capture_dpi = str(int(load_settings()["capture_dpi"]))
                 subprocess.run(['pdftoppm', '-png', '-r', capture_dpi, str(file_path), prefix], check=True)
-                os.remove(file_path) # Delete PDF so AMC analyse doesn't choke on it
+                os.remove(file_path) 
             except Exception as e:
                 print("Error extracting PDF with pdftoppm:", e)
 
-    # Run AMC analyse
+
     scan_settings = load_settings()
     amc_proj = AMCProject(str(PROJECTS_ROOT), name)
     try:
@@ -2941,6 +3138,9 @@ async def capture_scans(name: str, files: List[UploadFile] = File(...)):
 
 @router.get("/{name}/capture_data")
 def get_capture_data(name: str, code_name: Optional[str] = None):
+    """
+    API lấy dữ liệu các bài thi đã quét, bao gồm trang, mức độ nhạy và thông tin nhận diện.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "capture.sqlite"
     if not db_path.exists():
@@ -3028,7 +3228,7 @@ def get_capture_data(name: str, code_name: Optional[str] = None):
             if key in zone_dict and zone_dict[key]:
                 ratios = zone_dict[key]
                 min_dist = min([abs(r - 0.15) for r in ratios])
-                # Simple approximation for sensitivity display
+
                 sens = round(min_dist * 10, 1)
                 sens_val = str(sens)
                 
@@ -3066,6 +3266,9 @@ def get_capture_data(name: str, code_name: Optional[str] = None):
 
 @router.get("/{name}/capture_zooms")
 def get_capture_zooms(name: str, student: int, page: int, copy: int = 0):
+    """
+    API lấy danh sách ảnh phóng to (zoom) của từng ô đáp án trên bài thi đã quét.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "capture.sqlite"
     if not db_path.exists():
@@ -3116,6 +3319,9 @@ def get_capture_zooms(name: str, student: int, page: int, copy: int = 0):
 
 @router.get("/{name}/unrecognized_scans")
 def get_unrecognized_scans(name: str):
+    """
+    API lấy danh sách các tệp ảnh quét không nhận diện được mã định vị hoặc bị lỗi căn chỉnh.
+    """
     amc_proj = get_amc_project(name)
     db_path = amc_proj.data_dir / "capture.sqlite"
     if not db_path.exists():
@@ -3150,6 +3356,9 @@ def get_unrecognized_scans(name: str):
 
 @router.get("/{name}/unrecognized_scan_image")
 def get_unrecognized_scan_image(name: str, filename: str):
+    """
+    API tải về hình ảnh quét gốc của một tệp bị lỗi nhận diện.
+    """
     amc_proj = get_amc_project(name)
     clean_name = Path(filename).name
     target_file = amc_proj.scans_dir / clean_name
@@ -3164,6 +3373,9 @@ def get_unrecognized_scan_image(name: str, filename: str):
 
 @router.post("/{name}/unrecognized_scan_preprocess")
 def preprocess_unrecognized_scan(name: str, filename: str):
+    """
+    API thực hiện tiền xử lý ảnh nâng cao hỗ trợ căn chỉnh và nhận diện lại ảnh quét bị lỗi.
+    """
     amc_proj = get_amc_project(name)
     settings = load_settings()
     try:
@@ -3175,6 +3387,9 @@ def preprocess_unrecognized_scan(name: str, filename: str):
 
 @router.get("/{name}/unrecognized_diagnostic_image")
 def get_unrecognized_diagnostic_image(name: str, filename: str):
+    """
+    API lấy ảnh phân tích chẩn đoán trực quan cho ảnh quét bị lỗi.
+    """
     amc_proj = get_amc_project(name)
     clean_name = Path(filename).name
     diag_dir = amc_proj.cr_dir / "diagnostic"
@@ -3191,12 +3406,15 @@ def get_unrecognized_diagnostic_image(name: str, filename: str):
 
 @router.delete("/{name}/unrecognized_scan")
 def delete_unrecognized_scan(name: str, filename: str):
+    """
+    API xóa bỏ một tệp ảnh quét bị lỗi khỏi danh sách bài thi của dự án.
+    """
     amc_proj = get_amc_project(name)
     db_path = amc_proj.data_dir / "capture.sqlite"
     if not db_path.exists():
         raise HTTPException(status_code=404, detail="Database not found")
 
-    # 1. Delete physical scan file if exists
+
     clean_name = Path(filename).name
     target_file = amc_proj.scans_dir / clean_name
     if target_file.exists():
@@ -3205,7 +3423,7 @@ def delete_unrecognized_scan(name: str, filename: str):
         except Exception as e:
             print(f"Warning: could not delete physical scan file {target_file}: {e}")
 
-    # 2. Delete diagnostic image if exists
+
     diag_dir = amc_proj.cr_dir / "diagnostic"
     if diag_dir.exists():
         for diag_f in diag_dir.glob(f"{clean_name}*"):
@@ -3214,7 +3432,7 @@ def delete_unrecognized_scan(name: str, filename: str):
             except Exception as e:
                 print(f"Warning: could not delete diagnostic file {diag_f}: {e}")
 
-    # 3. Delete record from capture_failed
+    
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -3229,6 +3447,9 @@ def delete_unrecognized_scan(name: str, filename: str):
 
 @router.get("/{name}/capture_layout")
 def get_capture_layout(name: str, student: int, page: int, copy: int = 0):
+    """
+    API lấy ảnh hiển thị bố cục các ô nhận diện đè lên ảnh quét bài làm thực tế.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "capture.sqlite"
     if not db_path.exists():
@@ -3265,6 +3486,9 @@ def get_capture_layout(name: str, student: int, page: int, copy: int = 0):
 
 @router.delete("/{name}/capture")
 def delete_capture(name: str, student: int, page: int, copy: int = 0):
+    """
+    API xóa dữ liệu quét nhận diện của một trang bài thi cụ thể.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "capture.sqlite"
     if not db_path.exists():
@@ -3274,7 +3498,7 @@ def delete_capture(name: str, student: int, page: int, copy: int = 0):
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         
-        # Get the image name to delete it from cr/
+        
         cur.execute("SELECT layout_image FROM capture_page WHERE student=? AND page=? AND copy=?", (student, page, copy))
         row = cur.fetchone()
         if row and row[0]:
@@ -3297,6 +3521,9 @@ def delete_capture(name: str, student: int, page: int, copy: int = 0):
 
 @router.get("/{name}/manual_pages")
 def get_manual_pages(name: str):
+    """
+    API lấy danh sách các trang bài thi để phục vụ người dùng nhập/sửa ô tô thủ công.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "layout.sqlite"
     if not db_path.exists():
@@ -3317,6 +3544,9 @@ def get_manual_pages(name: str):
 
 @router.get("/{name}/subject_page")
 def get_subject_page(name: str, page: int):
+    """
+    API lấy hình ảnh trang đề thi tương ứng phục vụ đối chiếu khi nhập thủ công.
+    """
     project_dir = PROJECTS_ROOT / name
     pdf_path = project_dir / "DOC-sujet.pdf"
     if not pdf_path.exists():
@@ -3329,7 +3559,7 @@ def get_subject_page(name: str, page: int):
     if not png_path.exists():
         try:
             import subprocess
-            # pdftoppm -f Z -l Z -png -singlefile input output
+            
             prefix = str(cr_dir / f"page-{page}")
             subprocess.run(['pdftoppm', '-f', str(page), '-l', str(page), '-png', '-singlefile', '-r', '300', str(pdf_path), prefix], check=True)
         except Exception as e:
@@ -3343,6 +3573,9 @@ def get_subject_page(name: str, page: int):
 
 @router.get("/{name}/manual_layout")
 def get_manual_layout(name: str, student: int, page: int):
+    """
+    API lấy tọa độ các ô đáp án trên trang để vẽ giao diện chọn ô tô thủ công.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "layout.sqlite"
     if not db_path.exists():
@@ -3352,7 +3585,7 @@ def get_manual_layout(name: str, student: int, page: int):
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        # Fetch answer boxes
+        
         cur.execute("SELECT question, answer, xmin, xmax, ymin, ymax, role FROM layout_box WHERE student=? AND page=? AND role=1", (student, page))
         rows = cur.fetchall()
         boxes = [dict(r) for r in rows]
@@ -3364,6 +3597,9 @@ def get_manual_layout(name: str, student: int, page: int):
 
 @router.get("/{name}/capture_zone_state")
 def get_capture_zone_state(name: str, student: int, page: int, copy: int = 0):
+    """
+    API lấy trạng thái hiện tại (được tô hay không) của từng ô đáp án trên bài làm.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "capture.sqlite"
     if not db_path.exists():
@@ -3392,6 +3628,9 @@ class ToggleRequest(BaseModel):
 
 @router.post("/{name}/capture_zone_toggle")
 def toggle_capture_zone(name: str, req: ToggleRequest):
+    """
+    API cập nhật đảo trạng thái tô/bỏ tô của một ô đáp án khi người dùng chỉnh sửa thủ công.
+    """
     project_dir = PROJECTS_ROOT / name
     db_path = project_dir / "data" / "capture.sqlite"
     if not db_path.exists():
@@ -3402,14 +3641,14 @@ def toggle_capture_zone(name: str, req: ToggleRequest):
         cur = conn.cursor()
         now = int(time.time())
         
-        # Ensure capture_page exists
+        
         cur.execute("SELECT 1 FROM capture_page WHERE student=? AND page=? AND copy=?", (req.student, req.page, req.copy))
         if not cur.fetchone():
             cur.execute("INSERT INTO capture_page (student, page, copy, timestamp_manual) VALUES (?, ?, ?, ?)", (req.student, req.page, req.copy, now))
         else:
             cur.execute("UPDATE capture_page SET timestamp_manual=? WHERE student=? AND page=? AND copy=?", (now, req.student, req.page, req.copy))
             
-        # Toggle capture_zone
+        
         manual_val = 1.0 if req.checked else 0.0
         cur.execute("SELECT 1 FROM capture_zone WHERE student=? AND page=? AND copy=? AND type=4 AND id_a=? AND id_b=?", (req.student, req.page, req.copy, req.question, req.answer))
         if not cur.fetchone():
@@ -3428,6 +3667,9 @@ def toggle_capture_zone(name: str, req: ToggleRequest):
 
 @router.post("/from_archive")
 def create_project_from_archive(name: str = Form(...), file: UploadFile = File(...)):
+    """
+    API khởi tạo một dự án mới bằng cách giải nén từ tệp lưu trữ ZIP/TGZ tải lên.
+    """
     try:
         project_dir = PROJECTS_ROOT / name
         if project_dir.exists():
@@ -3480,6 +3722,9 @@ def create_project_from_archive(name: str = Form(...), file: UploadFile = File(.
 
 @router.post("/{name}/anonymize")
 def anonymize_project(name: str):
+    """
+    API kích hoạt tiến trình ẩn danh hóa bài thi của học sinh cho dự án.
+    """
     try:
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=name)
         settings = load_settings()
@@ -3490,6 +3735,9 @@ def anonymize_project(name: str):
 
 @router.get("/{name}/anonymous_documents")
 def download_anonymous_documents(name: str):
+    """
+    API nén và tải về toàn bộ các tệp bài thi PDF đã được ẩn danh hóa.
+    """
     import zipfile
     import tempfile
     from starlette.background import BackgroundTask
@@ -3500,7 +3748,7 @@ def download_anonymous_documents(name: str):
         if not anon_dir.exists() or not any(anon_dir.iterdir()):
             raise HTTPException(status_code=404, detail="No anonymized documents found.")
             
-        # Create a temporary zip file
+        
         temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
         with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for pdf_file in anon_dir.glob("*.pdf"):
@@ -3519,6 +3767,9 @@ def download_anonymous_documents(name: str):
 
 @router.post("/{name}/external_scores")
 def import_external_scores(name: str, file: UploadFile = File(...)):
+    """
+    API tải lên tệp CSV chứa điểm số bên ngoài và nhập vào cơ sở dữ liệu điểm của dự án.
+    """
     amc_proj = get_amc_project(name)
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
@@ -3537,6 +3788,9 @@ def import_external_scores(name: str, file: UploadFile = File(...)):
 
 @router.delete("/{name}/external_scores")
 def clear_external_scores(name: str):
+    """
+    API xóa toàn bộ điểm số bên ngoài đã nhập trong dự án.
+    """
     try:
         amc_proj = AMCProject(base_path=str(PROJECTS_ROOT), project_name=name)
         amc_proj.clear_external_scores()
